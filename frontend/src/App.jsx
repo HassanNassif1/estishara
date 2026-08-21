@@ -7,31 +7,17 @@ import {
   register,
   logout,
   getCurrentUser,
-  getVisaTypes, 
+  getVisaTypes,
 } from './services/api';
-import { useState, useEffect } from 'react'; 
-// 👇 ADD THESE TWO CRUCIAL IMPORTS 👇
-import { useTheme } from './ThemeContext'; 
+import { useState, useEffect } from 'react';
+import { useTheme } from './ThemeContext';
 import VisaTypes from './components/VisaTypes';
 import NavTabs from './components/NavTabs';
-import AuthSection from './components/AuthSection'; 
-import AppointmentForm from './components/AppointmentForm'; 
-import AppointmentList from './components/AppointmentList'; 
+import AuthSection from './components/AuthSection';
+import AppointmentForm from './components/AppointmentForm';
+import AppointmentList from './components/AppointmentList';
 import AdminDashboard from './components/AdminDashboard';
-
-// Helper component for the toggle button (Moved inside App.jsx for simplicity)
-function ThemeToggleButton() {
-  const { isDarkMode, toggleTheme } = useTheme();
-  return (
-    <button 
-      className="theme-toggle" 
-      onClick={toggleTheme} 
-      title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-    >
-      <i className={`fas ${isDarkMode ? 'fa-sun' : 'fa-moon'}`}></i>
-    </button>
-  );
-}
+import LoginPage from './pages/LoginPage';
 
 function App() {
   const [user, setUser] = useState(getCurrentUser());
@@ -39,8 +25,9 @@ function App() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  const [visaTypes, setVisaTypes] = useState([]); 
+  const [showLogin, setShowLogin] = useState(!getCurrentUser());
+  const [visaTypes, setVisaTypes] = useState([]);
+  const { isDarkMode } = useTheme();
 
   // Load visa types when the app starts
   useEffect(() => {
@@ -75,24 +62,34 @@ function App() {
   };
 
   useEffect(() => {
-    loadAppointments();
+    if (getCurrentUser()) {
+      loadAppointments();
+    }
   }, []);
 
-  const handleLogin = async (email, pass) => {
-    try {
-      const data = await login(email, pass);
-      setUser(data.user); 
-      
-      if (data.user.role === 'admin') setView('admin');
-      else setView('client');
-      
-      await loadAppointments(); 
-      return true;
-    } catch (err) {
-      alert(err.message);
-      return false;
+// In your login function
+const handleLogin = async (email, pass) => {
+  try {
+    const data = await login(email, pass);
+    setUser(data.user);
+    setShowLogin(false);
+    
+    // ✅ Make sure the token is being stored
+    // The login function should already do this, but verify
+    if (data.token) {
+      localStorage.setItem('token', data.token);
     }
-  };
+    
+    if (data.user.role === 'admin') setView('admin');
+    else setView('client');
+    
+    await loadAppointments();
+    return true;
+  } catch (err) {
+    alert(err.message);
+    return false;
+  }
+};
 
   const handleRegister = async (email, pass) => {
     try {
@@ -110,6 +107,7 @@ function App() {
     setUser(null);
     setView('client');
     setAppointments([]);
+    setShowLogin(true);
   };
 
   const handleAddAppointment = async (apptData) => {
@@ -142,96 +140,66 @@ function App() {
 
   const isAdmin = user?.role === 'admin';
   const isLoggedIn = !!user;
+  const displayedAppointments = appointments;
 
-  // The backend already filters appointments correctly for users.
-  const displayedAppointments = appointments; 
+  // If not logged in, show the login page
+  if (showLogin || !isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} onRegister={handleRegister} />;
+  }
 
   return (
-    <div className="app-wrapper">
-        <header className="brand-header">
+    <div className={`app-wrapper ${isDarkMode ? 'dark' : 'light'}`}>
+      <header className="brand-header">
         <div className="brand">
           <i className="fas fa-passport"></i>
           <h1>Estishara <span>· visa</span></h1>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          
-          {/* 🌙 THEME TOGGLE BUTTON */}
-          <ThemeToggleButton />
-
           <div className="auth-badge">
-            {isLoggedIn ? (
-              <>
-                <i className="fas fa-user-circle"></i> {user.email}
-                <span style={{ fontWeight: 400, color: '#64748b' }}>({user.role})</span>
-                <button className="btn btn-danger-outline" onClick={handleLogout}>
-                  <i className="fas fa-sign-out-alt"></i> Logout
-                </button>
-              </>
-            ) : (
-              <span style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <i className="fas fa-lock"></i> Not logged in
-              </span>
-            )}
+            <i className="fas fa-user-circle"></i> {user.email}
+            <span style={{ fontWeight: 400, color: '#64748b' }}>({user.role})</span>
+            <button className="btn btn-danger-outline" onClick={handleLogout}>
+              <i className="fas fa-sign-out-alt"></i> Logout
+            </button>
           </div>
         </div>
       </header>
 
-      {!isLoggedIn && ( <AuthSection onLogin={handleLogin} onRegister={handleRegister} /> )}
+      <NavTabs view={view} setView={setView} isAdmin={isAdmin} />
 
-      {isLoggedIn && ( <NavTabs view={view} setView={setView} isAdmin={isAdmin} /> )}
-
-      {/* --- VIEW SWITCHING LOGIC --- */}
-      {isLoggedIn && (
+      {isAdmin && view === 'admin' ? (
+        <AdminDashboard />
+      ) : (
         <>
-          {isAdmin && view === 'admin' ? (
-            /* ADMIN DASHBOARD VIEW */
-            <AdminDashboard />
-          ) : (
-            /* CLIENT VIEW (OR ADMIN VIEWING CLIENTS) */
-            <>
-              {/* Visa Types only visible to clients */}
-              {!isAdmin && <VisaTypes visaTypes={visaTypes} />}
-
-              {/* Booking form only visible to clients */}
-              {!isAdmin && (
-                <AppointmentForm visaTypes={visaTypes} onAdd={handleAddAppointment} />
-              )}
-              
-              <div className="section-title">
-                <h2>
-                  <i className="fas fa-clock" style={{ marginRight: '10px', color: '#4f46e5' }}></i>
-                  {isAdmin ? 'All appointments' : 'My appointments'}
-                </h2>
-                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                  {loading ? 'Loading...' : `${displayedAppointments.length} total`}
-                </span>
-              </div>
-              
-              {error && (
-                <div style={{ color: '#dc2626', padding: '12px', background: '#fef2f2', borderRadius: '12px', marginBottom: '10px', border: '1px solid #fecaca' }}>
-                  Error: {error}
-                </div>
-              )}
-              <AppointmentList
-                appointments={displayedAppointments}
-                isAdmin={isAdmin}
-                currentUser={user}
-                onUpdateStatus={handleUpdateStatus}
-                onDelete={handleDeleteAppointment}
-              />
-            </>
+          {!isAdmin && <VisaTypes visaTypes={visaTypes} />}
+          {!isAdmin && (
+            <AppointmentForm visaTypes={visaTypes} onAdd={handleAddAppointment} />
           )}
+          
+          <div className="section-title">
+            <h2>
+              <i className="fas fa-clock" style={{ marginRight: '10px', color: '#4f46e5' }}></i>
+              {isAdmin ? 'All appointments' : 'My appointments'}
+            </h2>
+            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+              {loading ? 'Loading...' : `${displayedAppointments.length} total`}
+            </span>
+          </div>
+          
+          {error && (
+            <div style={{ color: '#dc2626', padding: '12px', background: '#fef2f2', borderRadius: '12px', marginBottom: '10px', border: '1px solid #fecaca' }}>
+              Error: {error}
+            </div>
+          )}
+          <AppointmentList
+            appointments={displayedAppointments}
+            isAdmin={isAdmin}
+            currentUser={user}
+            onUpdateStatus={handleUpdateStatus}
+            onDelete={handleDeleteAppointment}
+          />
         </>
-      )}
-
-      {!isLoggedIn && (
-        <div className="login-prompt">
-          <i className="fas fa-lock" style={{ fontSize: '2.5rem', color: '#cbd5e1' }}></i>
-          <p style={{ marginTop: '12px', fontWeight: 500, color: '#475569' }}>
-            Please login or register to manage your visa appointments.
-          </p>
-        </div>
       )}
 
       <footer className="app-footer">

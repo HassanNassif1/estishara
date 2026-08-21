@@ -1,37 +1,32 @@
-// File: frontend/src/ThemeContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const ThemeContext = createContext();
 
-export const useTheme = () => useContext(ThemeContext);
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
 
 export const ThemeProvider = ({ children }) => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
 
-  // Load saved theme preference from local storage
   useEffect(() => {
-    const savedTheme = localStorage.getItem('estishara_theme');
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
+    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+    if (isDarkMode) {
       document.documentElement.setAttribute('data-theme', 'dark');
     } else {
-      setIsDarkMode(false);
       document.documentElement.removeAttribute('data-theme');
     }
-  }, []);
+  }, [isDarkMode]);
 
   const toggleTheme = () => {
-    setIsDarkMode((prev) => {
-      const newMode = !prev;
-      if (newMode) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('estishara_theme', 'dark');
-      } else {
-        document.documentElement.removeAttribute('data-theme');
-        localStorage.setItem('estishara_theme', 'light');
-      }
-      return newMode;
-    });
+    setIsDarkMode(!isDarkMode);
   };
 
   return (

@@ -4,6 +4,13 @@ import { updateAppointment } from '../services/api';
 function AppointmentList({ appointments, isAdmin, currentUser, onUpdateStatus, onDelete, refreshAppointments }) {
   
   const handleGenerateLink = async (appointment) => {
+    // ✅ Check if user is authenticated
+    const token = localStorage.getItem('estishara_token');
+    if (!token) {
+      alert('Please log in again to generate meeting links.');
+      return;
+    }
+
     let generatedLink = '';
     const platform = appointment.visa_type || 'Video';
 
@@ -18,22 +25,24 @@ function AppointmentList({ appointments, isAdmin, currentUser, onUpdateStatus, o
     }
 
     try {
-      await updateAppointment(appointment.id, { meeting_link: generatedLink });
+      // ✅ Use 'meetingLink' (camelCase) - the backend expects this
+      await updateAppointment(appointment.id, { meetingLink: generatedLink });
       alert(`✅ Link Generated and Saved!\n\n${generatedLink}`);
       if (refreshAppointments) refreshAppointments();
     } catch (error) {
       alert("Failed to save link: " + error.message);
     }
   };
+
   if (appointments.length === 0) {
     return (
       <div style={{ 
         padding: '40px', 
-        background: 'var(--bg-card)', // ✅ CHANGED FROM 'white'
+        background: 'var(--bg-card)',
         borderRadius: '20px', 
         textAlign: 'center', 
-        color: 'var(--text-muted)', // ✅ CHANGED TO CSS VAR
-        border: '1px solid var(--border-color)' // ✅ ADDED BORDER
+        color: 'var(--text-muted)',
+        border: '1px solid var(--border-color)'
       }}>
         <i className="fas fa-calendar-check" style={{ fontSize: '2.5rem', color: 'var(--text-light)', marginBottom: '12px' }}></i>
         <br />
@@ -50,15 +59,15 @@ function AppointmentList({ appointments, isAdmin, currentUser, onUpdateStatus, o
           <div className="appt-info">
             
             <div style={{ minWidth: '140px' }}>
-              <strong>{a.clientName}</strong>
+              <strong>{a.client_name}</strong>
               <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                <i className="far fa-envelope"></i> {a.clientEmail}
+                <i className="far fa-envelope"></i> {a.client_email}
               </div>
             </div>
 
             {isAdmin && (
               <span className="meta" style={{ background: '#e0e7ff', padding: '4px 12px', borderRadius: '20px', color: '#4338ca', fontWeight: 500 }}>
-                <i className="fas fa-video" style={{ marginRight: '4px' }}></i> {a.visaType || 'Not specified'}
+                <i className="fas fa-video" style={{ marginRight: '4px' }}></i> {a.visa_type || 'Not specified'}
               </span>
             )}
 
@@ -123,7 +132,7 @@ function AppointmentList({ appointments, isAdmin, currentUser, onUpdateStatus, o
               </>
             )}
             
-            {(isAdmin || a.clientEmail === currentUser?.email) && (
+            {(isAdmin || a.client_email === currentUser?.email) && (
               <button className="btn btn-danger-outline" style={{ padding: '6px 12px', fontSize: '0.75rem' }} onClick={() => onDelete(a.id)}>
                 <i className="fas fa-trash-alt"></i>
               </button>

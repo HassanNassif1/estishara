@@ -1,4 +1,4 @@
-// File: frontend/src/services/api.js (Fixed for Vite)
+// File: frontend/src/services/api.js (Fully Fixed)
 // Vite uses import.meta.env instead of process.env
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -146,18 +146,28 @@ export const createAppointment = async (appointmentData) => {
   }
 };
 
-export const updateAppointment = async (id, updates) => {
-  try {
-    const response = await fetch(`${API_URL}/appointments/${id}`, {
-      method: 'PUT',
-      headers: getHeaders(true),
-      body: JSON.stringify(updates),
-    });
-    return handleResponse(response);
-  } catch (error) {
-    console.error('Update appointment error:', error);
-    throw error;
+// ✅ FIXED: updateAppointment with proper token handling
+export const updateAppointment = async (id, data) => {
+  const token = localStorage.getItem('estishara_token');
+  if (!token) {
+    throw new Error('No authentication token found. Please log in again.');
   }
+
+  const response = await fetch(`${API_URL}/appointments/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update appointment');
+  }
+
+  return response.json();
 };
 
 export const deleteAppointment = async (id) => {
@@ -176,23 +186,21 @@ export const deleteAppointment = async (id) => {
   }
 };
 
-// ==================== AUTHENTICATED USER SERVICE ====================
+// ==================== AVAILABILITY SERVICES ====================
 
-export const getCurrentUserProfile = async () => {
+export const getBookedTimes = async (date) => {
   try {
-    const response = await fetch(`${API_URL}/auth/me`, {
+    const response = await fetch(`${API_URL}/availability/${date}`, {
       headers: getHeaders(true),
     });
     return handleResponse(response);
   } catch (error) {
-    console.error('Get user profile error:', error);
+    console.error('Get availability error:', error);
     throw error;
   }
 };
-// Add this to the bottom of your api.js file, before the final export
 
-// In frontend/src/services/api.js
-// Add this at the bottom, before the final export
+// ==================== ADMIN SERVICES ====================
 
 export const getAdminStats = async () => {
   try {
@@ -205,14 +213,17 @@ export const getAdminStats = async () => {
     throw error;
   }
 };
-export const getBookedTimes = async (date) => {
+
+// ==================== AUTHENTICATED USER SERVICE ====================
+
+export const getCurrentUserProfile = async () => {
   try {
-    const response = await fetch(`${API_URL}/availability/${date}`, {
-      headers: getHeaders(true), // CHANGE THIS FROM FALSE TO TRUE!
+    const response = await fetch(`${API_URL}/auth/me`, {
+      headers: getHeaders(true),
     });
     return handleResponse(response);
   } catch (error) {
-    console.error('Get availability error:', error);
+    console.error('Get user profile error:', error);
     throw error;
   }
 };
